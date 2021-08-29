@@ -8,6 +8,7 @@ import (
 	"github.com/deref/exo/internal/manifest"
 	"github.com/deref/exo/internal/providers/docker/compose"
 	"github.com/deref/exo/internal/util/yamlutil"
+	"github.com/goccy/go-yaml"
 )
 
 type Loader struct {
@@ -16,14 +17,15 @@ type Loader struct {
 }
 
 func (i *Loader) Load(r io.Reader) manifest.LoadResult {
-	composeProject, err := compose.Parse(r)
-	if err != nil {
+	var composeProject compose.ProjectTemplate
+	dec := yaml.NewDecoder(r)
+	if err := dec.Decode(&composeProject); err != nil {
 		return manifest.LoadResult{Err: fmt.Errorf("parsing: %w", err)}
 	}
-	return i.convert(composeProject)
+	return i.convert(&composeProject)
 }
 
-func (i *Loader) convert(project *compose.Compose) manifest.LoadResult {
+func (i *Loader) convert(project *compose.ProjectTemplate) manifest.LoadResult {
 	res := manifest.LoadResult{
 		Manifest: &manifest.Manifest{},
 	}
@@ -118,19 +120,21 @@ func (i *Loader) convert(project *compose.Compose) manifest.LoadResult {
 		// Map the docker-compose network name to the name of the docker network that is created.
 		defaultNetworkName := networksByComposeName["default"]
 		if len(service.Networks) > 0 {
-			mappedNetworks := make([]string, len(service.Networks))
-			for i, network := range service.Networks {
-				networkName, ok := networksByComposeName[network]
+			mappedNetworks := make(map[string]compose.ServiceNetworkTemplate, len(service.Networks))
+			for originalName, network := range service.Networks {
+				networkName, ok := networksByComposeName[originalName]
 				if !ok {
 					res.Err = fmt.Errorf("unknown network: %q", network)
 					continue
 				}
-				mappedNetworks[i] = networkName
-				component.DependsOn = append(component.DependsOn, network)
+				mappedNetworks[originalName] = network
+				component.DependsOn = append(component.DependsOn, networkName)
 			}
 			service.Networks = mappedNetworks
 		} else {
-			service.Networks = []string{defaultNetworkName}
+			service.Networks = compose.ServiceNetworksTemplate{
+				defaultNetworkName: compose.ServiceNetworkTemplate{},
+			}
 			component.DependsOn = append(component.DependsOn, "default")
 		}
 
@@ -149,7 +153,7 @@ func (i *Loader) convert(project *compose.Compose) manifest.LoadResult {
 			}
 		}
 
-		for _, dependency := range service.DependsOn.Services {
+		for _, dependency := range service.DependsOn {
 			if dependency.Condition != "service_started" {
 				res = res.AddUnsupportedFeatureWarning(fmt.Sprintf("service condition %q", dependency.Service), "only service_started is currently supported")
 			}

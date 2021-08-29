@@ -1,25 +1,37 @@
 package compose
 
-type Build BuildConfig
+type BuildTemplate ExpandedBuildTemplate
 
-func (b Build) MarshalYAML() (interface{}, error) {
-	return BuildConfig(b), nil
+func (b BuildTemplate) MarshalYAML() (interface{}, error) {
+	return ExpandedBuildTemplate(b), nil
 }
 
-func (dict *Build) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (dict *BuildTemplate) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var s string
-	var cfg BuildConfig
+	var expanded ExpandedBuildTemplate
 	err := unmarshal(&s)
 	if err == nil {
-		cfg.Context = s
-	} else if err := unmarshal(&cfg); err != nil {
+		expanded.Context = s
+	} else if err := unmarshal(&expanded); err != nil {
 		return nil
 	}
-	*dict = Build(cfg)
+	*dict = BuildTemplate(expanded)
 	return nil
 }
 
-type BuildConfig struct {
+type ExpandedBuildTemplate struct {
+	Context    string     `yaml:"context"`
+	Dockerfile string     `yaml:"dockerfile"`
+	Args       Dictionary `yaml:"args"`
+	CacheFrom  []string   `yaml:"cache_from"`
+	ExtraHosts []string   `yaml:"extra_hosts"`
+	Isolation  string     `yaml:"isolation"`
+	Labels     Dictionary `yaml:"labels"`
+	ShmSize    string     `yaml:"shm_size"`
+	Target     string     `yaml:"target"`
+}
+
+type Build struct {
 	Context    string     `yaml:"context"`
 	Dockerfile string     `yaml:"dockerfile"`
 	Args       Dictionary `yaml:"args"`

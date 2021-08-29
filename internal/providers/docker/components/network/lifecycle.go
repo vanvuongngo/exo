@@ -12,7 +12,7 @@ import (
 
 func (n *Network) Initialize(ctx context.Context, input *core.InitializeInput) (output *core.InitializeOutput, err error) {
 	if n.Name == "" {
-		return nil, errors.New("Network must have a name")
+		return nil, errors.New("network must have a name")
 	}
 
 	existing, err := n.findExistingNetwork(ctx)

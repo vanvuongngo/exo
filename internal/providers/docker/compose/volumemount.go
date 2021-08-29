@@ -8,20 +8,32 @@ import (
 	"github.com/goccy/go-yaml"
 )
 
-type VolumeMount struct {
+type VolumeMountTemplate struct {
 	Type        string
 	Source      string
 	Target      string
-	ReadOnly    bool
-	Bind        *BindOptions
-	Volume      *VolumeOptions
-	Tmpfs       *TmpfsOptions
+	ReadOnly    BoolExpression
+	Bind        *BindOptionsTemplate
+	Volume      *VolumeOptionsTemplate
+	Tmpfs       *TmpfsOptionsTemplate
 	Consistency *IgnoredField
 }
 
-// extendedVolumeMount is a private struct that is structurally identical to VolumeAttachment but
-// is only used for YAML unmarshalling where we do not need to consider the short string-based syntax.
-type extendedVolumeMount struct {
+// extendedVolumeMountTemplate is a private struct that is structurally
+// identical to VolumeMountTemplate but is only used for YAML unmarshalling
+// where we do not need to consider the short string-based syntax.
+type extendedVolumeMountTemplate struct {
+	Type        string                 `yaml:"type"`
+	Source      string                 `yaml:"source"`
+	Target      string                 `yaml:"target"`
+	ReadOnly    BoolExpression         `yaml:"read_only"`
+	Bind        *BindOptionsTemplate   `yaml:"bind"`
+	Volume      *VolumeOptionsTemplate `yaml:"volume"`
+	Tmpfs       *TmpfsOptionsTemplate  `yaml:"tmpfs"`
+	Consistency *IgnoredField          `yaml:"consistency"`
+}
+
+type VolumeMount struct {
 	Type        string         `yaml:"type"`
 	Source      string         `yaml:"source"`
 	Target      string         `yaml:"target"`
@@ -32,21 +44,21 @@ type extendedVolumeMount struct {
 	Consistency *IgnoredField  `yaml:"consistency"`
 }
 
-func (vm *VolumeMount) UnmarshalYAML(b []byte) error {
+func (vm *VolumeMountTemplate) UnmarshalYAML(b []byte) error {
 	var asString string
 	if err := yaml.Unmarshal(b, &asString); err == nil {
 		return vm.fromShortSyntax(asString)
 	}
 
-	asExtended := extendedVolumeMount{}
+	asExtended := extendedVolumeMountTemplate{}
 	if err := yaml.Unmarshal(b, &asExtended); err != nil {
 		return err
 	}
 	vm.Type = asExtended.Type
 	vm.Source = asExtended.Source
 	vm.Target = asExtended.Target
-	vm.ReadOnly = asExtended.ReadOnly
 	vm.Bind = asExtended.Bind
+	vm.ReadOnly = asExtended.ReadOnly
 	vm.Volume = asExtended.Volume
 	vm.Tmpfs = asExtended.Tmpfs
 	vm.Consistency = asExtended.Consistency
@@ -54,7 +66,7 @@ func (vm *VolumeMount) UnmarshalYAML(b []byte) error {
 	return nil
 }
 
-func (vm *VolumeMount) fromShortSyntax(in string) error {
+func (vm *VolumeMountTemplate) fromShortSyntax(in string) error {
 	parts := strings.Split(in, ":")
 	switch len(parts) {
 	case 1:
@@ -69,7 +81,7 @@ func (vm *VolumeMount) fromShortSyntax(in string) error {
 		accessMode := parts[2]
 		switch accessMode {
 		case "ro":
-			vm.ReadOnly = true
+			vm.ReadOnly = "true"
 		case "rw":
 			// Do nothing - va.ReadOnly is already false.
 		default:
@@ -84,26 +96,39 @@ func (vm *VolumeMount) fromShortSyntax(in string) error {
 
 var localPathRe = regexp.MustCompile("^[./~]")
 
-func (vm *VolumeMount) setSource(src string) {
+func (vm *VolumeMountTemplate) setSource(src string) {
 	vm.Source = src
 	if localPathRe.MatchString(src) {
 		vm.Type = "bind"
-		vm.Bind = &BindOptions{
+		vm.Bind = &BindOptionsTemplate{
 			// CreateHostPath is always implied by the short syntax.
-			CreateHostPath: true,
+			CreateHostPath: "true",
 		}
 	} else {
 		vm.Type = "volume"
 	}
 }
 
+type VolumeOptionsTemplate struct {
+	Nocopy BoolExpression `yaml:"nocopy"`
+}
+
 type VolumeOptions struct {
 	Nocopy bool `yaml:"nocopy"`
+}
+
+type BindOptionsTemplate struct {
+	Propagation    string         `yaml:"propagation"`
+	CreateHostPath BoolExpression `yaml:"create_host_path"`
 }
 
 type BindOptions struct {
 	Propagation    string `yaml:"propagation"`
 	CreateHostPath bool   `yaml:"create_host_path"`
+}
+
+type TmpfsOptionsTemplate struct {
+	Size Int64Expression `yaml:"size"`
 }
 
 type TmpfsOptions struct {

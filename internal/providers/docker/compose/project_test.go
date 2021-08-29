@@ -6,14 +6,15 @@ import (
 	"testing"
 
 	"github.com/deref/exo/internal/providers/docker/compose"
+	"github.com/deref/exo/internal/util/yamlutil"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestParseService(t *testing.T) {
+func TestParseServiceTemplate(t *testing.T) {
 	testCases := []struct {
 		name     string
 		in       string
-		expected compose.Service
+		expected compose.ServiceTemplate
 	}{
 		{
 			name: "volumes - full syntax",
@@ -34,31 +35,31 @@ func TestParseService(t *testing.T) {
   target: /data/buffer
   tmpfs:
     size: 208666624`,
-			expected: compose.Service{
-				Volumes: []compose.VolumeMount{
+			expected: compose.ServiceTemplate{
+				Volumes: []compose.VolumeMountTemplate{
 					{
 						Type:     "volume",
 						Source:   "mydata",
 						Target:   "/data",
-						ReadOnly: true,
-						Volume: &compose.VolumeOptions{
-							Nocopy: true,
+						ReadOnly: "true",
+						Volume: &compose.VolumeOptionsTemplate{
+							Nocopy: "true",
 						},
 					},
 					{
 						Type:   "bind",
 						Source: "/path/a",
 						Target: "/path/b",
-						Bind: &compose.BindOptions{
+						Bind: &compose.BindOptionsTemplate{
 							Propagation:    "rshared",
-							CreateHostPath: true,
+							CreateHostPath: "true",
 						},
 					},
 					{
 						Type:   "tmpfs",
 						Target: "/data/buffer",
-						Tmpfs: &compose.TmpfsOptions{
-							Size: 208666624,
+						Tmpfs: &compose.TmpfsOptionsTemplate{
+							Size: "208666624",
 						},
 					},
 				},
@@ -73,8 +74,8 @@ func TestParseService(t *testing.T) {
 - "/home/fred/.ssh:/root/.ssh:ro"
 - '~/util:/usr/bin/util:rw'
 - my-log-volume:/var/log/xyzzy`,
-			expected: compose.Service{
-				Volumes: []compose.VolumeMount{
+			expected: compose.ServiceTemplate{
+				Volumes: []compose.VolumeMountTemplate{
 					{
 						Type:   "volume",
 						Target: "/var/myapp",
@@ -83,25 +84,25 @@ func TestParseService(t *testing.T) {
 						Type:   "bind",
 						Source: "./data",
 						Target: "/data",
-						Bind: &compose.BindOptions{
-							CreateHostPath: true,
+						Bind: &compose.BindOptionsTemplate{
+							CreateHostPath: "true",
 						},
 					},
 					{
 						Type:     "bind",
 						Source:   "/home/fred/.ssh",
 						Target:   "/root/.ssh",
-						ReadOnly: true,
-						Bind: &compose.BindOptions{
-							CreateHostPath: true,
+						ReadOnly: "true",
+						Bind: &compose.BindOptionsTemplate{
+							CreateHostPath: "true",
 						},
 					},
 					{
 						Type:   "bind",
 						Source: "~/util",
 						Target: "/usr/bin/util",
-						Bind: &compose.BindOptions{
-							CreateHostPath: true,
+						Bind: &compose.BindOptionsTemplate{
+							CreateHostPath: "true",
 						},
 					},
 					{
@@ -118,18 +119,15 @@ func TestParseService(t *testing.T) {
 			in: `depends_on:
 - db
 - messages`,
-			expected: compose.Service{
-				DependsOn: compose.ServiceDependencies{
-					IsShortSyntax: true,
-					Services: []compose.ServiceDependency{
-						{
-							Service:   "db",
-							Condition: "service_started",
-						},
-						{
-							Service:   "messages",
-							Condition: "service_started",
-						},
+			expected: compose.ServiceTemplate{
+				DependsOn: []compose.ServiceDependencyTemplate{
+					{
+						Service:   "db",
+						Condition: "service_started",
+					},
+					{
+						Service:   "messages",
+						Condition: "service_started",
 					},
 				},
 			},
@@ -141,17 +139,15 @@ func TestParseService(t *testing.T) {
   db:
   messages:
     condition: service_healthy`,
-			expected: compose.Service{
-				DependsOn: compose.ServiceDependencies{
-					Services: []compose.ServiceDependency{
-						{
-							Service:   "db",
-							Condition: "service_started",
-						},
-						{
-							Service:   "messages",
-							Condition: "service_healthy",
-						},
+			expected: compose.ServiceTemplate{
+				DependsOn: []compose.ServiceDependencyTemplate{
+					{
+						Service:   "db",
+						Condition: "service_started",
+					},
+					{
+						Service:   "messages",
+						Condition: "service_healthy",
 					},
 				},
 			},
@@ -172,10 +168,25 @@ func TestParseService(t *testing.T) {
 				content.WriteByte('\n')
 			}
 
-			comp, err := compose.Parse(&content)
-			assert.NoError(t, err)
+			var proj compose.ProjectTemplate
+			yamlutil.MustUnmarshalString(content.String(), &proj)
 
-			svc := comp.Services["test-svc"]
+			// Ignore MapSlice fields in test.
+			proj.MapSlice = nil
+			for k, service := range proj.Services {
+				service.MapSlice = nil
+				proj.Services[k] = service
+			}
+			for k, volume := range proj.Volumes {
+				volume.MapSlice = nil
+				proj.Volumes[k] = volume
+			}
+			for k, network := range proj.Networks {
+				network.MapSlice = nil
+				proj.Networks[k] = network
+			}
+
+			svc := proj.Services["test-svc"]
 			assert.Equal(t, expected, svc)
 		})
 	}

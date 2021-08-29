@@ -292,12 +292,23 @@ func (c *Container) create(ctx context.Context) error {
 		// TODO: Add other specified aliases.
 		Aliases: []string{c.ComponentID, c.ComponentName},
 	}
+
+	// Network names in arbitrary order from spec networks keys.
+	networkNames := make([]string, len(c.Spec.Networks))
+	{
+		i := 0
+		for networkName := range c.Spec.Networks {
+			networkNames[i] = networkName
+			i++
+		}
+	}
+
 	// Docker only allows a single network to be specified when creating a container. The other networks must be
 	// connected after the container is started. See https://github.com/moby/moby/issues/29265#issuecomment-265909198.
-	var remainingNetworks []string
-	if len(c.Spec.Networks) > 0 {
-		firstNetworkName := c.Spec.Networks[0]
-		remainingNetworks = c.Spec.Networks[1:]
+	var remainingNetworkNames []string
+	if len(networkNames) > 0 {
+		firstNetworkName := networkNames[0]
+		remainingNetworkNames = networkNames[1:]
 		networkCfg.EndpointsConfig[firstNetworkName] = netEndpointSettings
 	}
 
@@ -328,7 +339,7 @@ func (c *Container) create(ctx context.Context) error {
 	}
 	c.State.ContainerID = createdBody.ID
 	var netConnects errgroup.Group
-	for _, networkName := range remainingNetworks {
+	for _, networkName := range remainingNetworkNames {
 		networkName := networkName
 		netConnects.Go(func() error {
 			return c.Docker.NetworkConnect(ctx, networkName, createdBody.ID, netEndpointSettings)
