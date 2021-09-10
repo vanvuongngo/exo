@@ -184,8 +184,7 @@ type CreateComponentInput struct {
 }
 
 type CreateComponentOutput struct {
-	ID    string `json:"id"`
-	JobID string `json:"jobId"`
+	ID string `json:"id"`
 }
 
 type UpdateComponentInput struct {

@@ -99,7 +99,6 @@ interface "workspace" {
     input "depends-on" "[]string" {}
 
     output "id" "string" {}
-    output "job-id" "string" {}
   }
 
   method "update-component" {

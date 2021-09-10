@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/deref/exo/internal/core/api"
 	"github.com/deref/exo/internal/providers/docker/components/network"
 	"github.com/deref/exo/internal/util/yamlutil"
@@ -57,6 +59,7 @@ docker network create <name>
 		if err != nil {
 			return err
 		}
-		return watchJob(ctx, cl.Kernel(), output.JobID)
+		fmt.Println(output.ID)
+		return nil
 	},
 }

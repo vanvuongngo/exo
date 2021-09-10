@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/deref/exo/internal/core/api"
@@ -72,6 +73,7 @@ before the program name.
 		if err != nil {
 			return err
 		}
-		return watchJob(ctx, cl.Kernel(), output.JobID)
+		fmt.Println(output.ID)
+		return nil
 	},
 }
