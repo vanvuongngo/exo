@@ -12,22 +12,9 @@ import (
 	"github.com/deref/exo/internal/core/state/api"
 	state "github.com/deref/exo/internal/core/state/api"
 	"github.com/deref/exo/internal/deps"
-	"github.com/deref/exo/internal/util/atom"
 	"github.com/deref/exo/internal/util/errutil"
 	"github.com/deref/exo/internal/util/pathutil"
 )
-
-func New(filename string) *Store {
-	return &Store{
-		atom: atom.NewFileAtom(filename, atom.CodecJSON),
-	}
-}
-
-type Store struct {
-	atom atom.Atom
-}
-
-var _ state.Store = (*Store)(nil)
 
 type Root struct {
 	Workspaces          map[string]*Workspace `json:"workspaces"`          // Keyed by ID.
@@ -43,67 +30,6 @@ type Component struct {
 	Initialized *string  `json:"initialized"`
 	Disposed    *string  `json:"disposed"`
 	DependsOn   []string `json:"dependsOn"`
-}
-
-func (c *Component) getDescription(id, workspaceID string) state.ComponentDescription {
-	return state.ComponentDescription{
-		ID:          id,
-		WorkspaceID: workspaceID,
-		Name:        c.Name,
-		Type:        c.Type,
-		Spec:        c.Spec,
-		State:       c.State,
-		Created:     c.Created,
-		Initialized: c.Initialized,
-		Disposed:    c.Disposed,
-		DependsOn:   c.DependsOn,
-	}
-}
-
-func (sto *Store) deref() (*Root, error) {
-	var root Root
-	err := sto.atom.Deref(&root)
-	return &root, err
-}
-
-func (sto *Store) swap(f func(root *Root) error) (*Root, error) {
-	var root Root
-	err := sto.atom.Swap(&root, func() error {
-		if root.Workspaces == nil {
-			root.Workspaces = make(map[string]*Workspace)
-		}
-		if root.ComponentWorkspaces == nil {
-			root.ComponentWorkspaces = make(map[string]string)
-		}
-		return f(&root)
-	})
-	return &root, err
-}
-
-func (sto *Store) DescribeWorkspaces(ctx context.Context, input *state.DescribeWorkspacesInput) (*state.DescribeWorkspacesOutput, error) {
-	var root Root
-	if err := sto.atom.Deref(&root); err != nil {
-		return nil, err
-	}
-
-	var ids map[string]bool
-	if input.IDs != nil {
-		ids = make(map[string]bool, len(input.IDs))
-	}
-	for _, id := range input.IDs {
-		ids[id] = true
-	}
-
-	var output state.DescribeWorkspacesOutput
-	for id, workspace := range root.Workspaces {
-		if ids == nil || ids[id] {
-			output.Workspaces = append(output.Workspaces, state.WorkspaceDescription{
-				ID:   id,
-				Root: workspace.Root,
-			})
-		}
-	}
-	return &output, nil
 }
 
 func (sto *Store) AddWorkspace(ctx context.Context, input *state.AddWorkspaceInput) (*state.AddWorkspaceOutput, error) {

@@ -1,4 +1,6 @@
 interface "store" {
+  
+  // TODO: method "collect-garbage" {}
 
   method "describe-workspaces" {
     doc = "Returns workspace descriptions."
